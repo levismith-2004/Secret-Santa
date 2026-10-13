@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Family Secret Santa</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f6f8f6;--sf:#fff;--ink:#1c2b25;--mu:#5d6f66;--pine:#1f5a46;--berry:#b3263e;--gold:#d9a441;--ln:#d9e2dc;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121c18;--sf:#1b2924;--ink:#eaf1ed;--mu:#9bb0a5;--pine:#4fae8a;--berry:#ff6b81;--gold:#e6b85c;--ln:#2c3e36}}
+:root[data-theme="dark"]{--bg:#121c18;--sf:#1b2924;--ink:#eaf1ed;--mu:#9bb0a5;--pine:#4fae8a;--berry:#ff6b81;--gold:#e6b85c;--ln:#2c3e36}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Figtree,system-ui,sans-serif}
+h1,h2,h3{font-family:'Bricolage Grotesque',Georgia,sans-serif;margin:0;line-height:1.15}
+main{max-width:860px;margin:0 auto;padding:16px}
+header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin-bottom:12px}
+header h1{font-size:1.5rem;font-weight:800;color:var(--berry)}
+nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--ln);background:var(--sf);border-radius:8px;padding:8px 14px;min-height:40px}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+button.on,button.pri{background:var(--pine);border-color:var(--pine);color:#fff}
+button.warn{color:var(--berry);border-color:var(--berry)}
+input,select{background:var(--sf);border:1px solid var(--ln);border-radius:8px;padding:8px 10px;min-height:40px;width:100%}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.w{background:var(--sf);border:1px solid var(--ln);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px}
+.tag{border-radius:6px 22px 22px 6px;border-left:6px solid var(--gold);position:relative;padding-left:30px}
+.tag:before{content:"";position:absolute;left:10px;top:16px;width:10px;height:10px;border-radius:50%;background:var(--bg);border:2px solid var(--gold)}
+.big{font:800 2.6rem/1 'Bricolage Grotesque',sans-serif;color:var(--pine)}
+.mu{color:var(--mu);font-size:.9rem}
+.bar{height:8px;background:var(--ln);border-radius:4px;overflow:hidden}.bar i{display:block;height:100%;background:var(--pine)}
+.row{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--ln);flex-wrap:wrap}
+.row:last-child{border-bottom:0}.row>div{min-width:0;flex:1 1 180px;overflow-wrap:anywhere}
+.done{color:var(--pine);font-weight:600}.taken{color:var(--mu);font-style:italic}
+.form{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:10px}
+.err{color:var(--berry);font-weight:600}
+.login{max-width:360px;margin:8vh auto;display:grid;gap:10px}
+a{color:var(--pine)}
+</style></head><body><main id="app"></main>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safeUrl=u=>/^https?:\/\//i.test(u)?u:'';
+let T='',ST=null,tab='home',pv=0,msg='';
+try{T=localStorage.getItem('st')||''}catch(e){}
+const setT=v=>{T=v;try{v?localStorage.setItem('st',v):localStorage.removeItem('st')}catch(e){}};
+async function api(m,p,b){
+  const r=await fetch('/api/'+p,{method:m,headers:{'Content-Type':'application/json',Authorization:'Bearer '+T},body:b?JSON.stringify(b):undefined});
+  let j={};try{j=await r.json()}catch(e){}
+  if(r.status===401&&p!=='login'){setT('');ST=null;render();throw 0}
+  if(!r.ok){msg=j.error||'Something went wrong.';throw 0}
+  return j}
+async function refresh(){try{ST=await api('GET','state')}catch(e){}render()}
+async function run(m,p,b){msg='';try{await api(m,p,b);await refresh()}catch(e){render()}}
+function render(){
+  const a=$('#app');
+  if(!ST){a.innerHTML=`<form class="login" data-form="login"><h1 style="color:var(--berry)">Family Secret Santa</h1>
+  <label>Your name<input id="ln" autocomplete="username" required></label>
+  <label>Password<input id="lp" type="password" autocomplete="current-password" required></label>
+  <button class="pri" type="submit">Sign in</button><div class="err">${esc(msg)}</div></form>`;return}
+  const tabs=[['home','Home'],['list','My list'],['people','My people']].concat(ST.me.admin?[['admin','Admin']]:[]);
+  a.innerHTML=`<header><h1>Secret Santa</h1><div class="mu">Signed in as ${esc(ST.me.name)} <button data-act="out">Sign out</button></div></header>
+  <nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" data-act="tab" data-v="${t[0]}">${t[1]}</button>`).join('')}</nav>
+  ${msg?`<p class="err">${esc(msg)}</p>`:''}${{home,list,people,admin}[tab]()}`;
+}
+const link=i=>safeUrl(i.link)?`<div><a href="${esc(i.link)}" target="_blank" rel="noopener">Link</a></div>`:'';
+function home(){
+  const now=new Date();let x=new Date(now.getFullYear(),11,25);if(x<now)x=new Date(now.getFullYear()+1,11,25);
+  const days=Math.ceil((x-now)/864e5);
+  const ppl=ST.people.map((p,i)=>{const got=p.items.filter(i=>i.claim).length,n=p.items.length;
+    return`<div class="w tag"><h3>${esc(p.name)}</h3><div class="mu">${got} of ${n} listed gifts bought${p.extras.length?`, plus ${p.extras.length} extra`:''}</div>
+    <div class="bar"><i style="width:${n?Math.round(got/n*100):0}%"></i></div>
+    <button data-act="open" data-v="${i}">Open ${esc(p.name)}'s list</button></div>`}).join('');
+  return`<div class="grid"><div class="w"><div class="big">${days}</div><div>days until Christmas</div></div>
+  <div class="w"><h3>My wish list</h3><div class="mu">${ST.items.length} item${ST.items.length===1?'':'s'} on your list</div><button data-act="tab" data-v="list">Edit my list</button></div>
+  ${ST.drawDone?ppl:'<div class="w"><h3>My people</h3><div class="mu">The draw has not been run yet.</div></div>'}
+  ${ST.me.admin?`<div class="w"><h3>Admin</h3><div class="mu">${ST.drawDone?'Draw is done.':'Draw not run.'} ${ST.users.length} people.</div><button data-act="tab" data-v="admin">Manage people</button></div>`:''}</div>`;
+}
+function list(){
+  return`<div class="w"><h2>My wish list</h2><p class="mu">Your two Secret Santas can see this list. You will never see what they have bought.</p>
+  <form class="form" data-form="add"><input id="it" placeholder="Gift idea" required><input id="in" placeholder="Size, colour, notes"><input id="il" placeholder="Link (optional)" inputmode="url"><button class="pri" type="submit">Add to list</button></form>
+  ${ST.items.length?ST.items.map(i=>`<div class="row"><div><b>${esc(i.title)}</b>${i.note?`<div class="mu">${esc(i.note)}</div>`:''}${link(i)}</div><button class="warn" data-act="del" data-v="${i.id}">Remove</button></div>`).join(''):'<p class="mu">Nothing here yet. Add your first idea above.</p>'}</div>`;
+}
+function people(){
+  if(!ST.people.length)return'<div class="w"><p class="mu">The draw has not been run yet.</p></div>';
+  const p=ST.people[pv]||ST.people[0];
+  return`<nav>${ST.people.map((q,i)=>`<button class="${pv===i?'on':''}" data-act="open" data-v="${i}">${esc(q.name)}</button>`).join('')}</nav>
+  <div class="w tag"><h2>${esc(p.name)}'s list</h2><p class="mu">Ticks are shared with anyone else buying for ${esc(p.name)}, without names. ${esc(p.name)} never sees them.</p>
+  ${p.items.length?p.items.map(i=>{const st=!i.claim?`<button class="pri" data-act="claim" data-v="${i.id}">I bought this</button>`:i.claim==='me'?`<span class="done">You bought this</span> <button data-act="unclaim" data-v="${i.claimId}">Undo</button>`:'<span class="taken">Already bought</span>';
+    return`<div class="row"><div><b>${esc(i.title)}</b>${i.note?`<div class="mu">${esc(i.note)}</div>`:''}${link(i)}</div><div>${st}</div></div>`}).join(''):`<p class="mu">${esc(p.name)} has not added anything yet.</p>`}
+  <h3 style="margin-top:12px">Bought something else?</h3>
+  ${p.extras.map(c=>`<div class="row"><div>${esc(c.text)}</div><div>${c.mine?`<span class="done">You bought this</span> <button data-act="unclaim" data-v="${c.id}">Remove</button>`:'<span class="taken">Already bought</span>'}</div></div>`).join('')}
+  <form class="form" data-form="extra"><input id="xt" placeholder="What did you buy?" required><button class="pri" type="submit">Mark as bought</button></form></div>`;
+}
+function admin(){
+  return`<div class="w"><h2>People</h2><p class="mu">Add a person, or type an existing name to reset their password.</p>
+  <form class="form" data-form="user"><input id="un" placeholder="Name" required><input id="up" placeholder="Password" required><button class="pri" type="submit">Save person</button></form>
+  ${ST.users.map(u=>`<div class="row"><div><b>${esc(u.name)}</b>${u.admin?' (admin)':''}</div></div>`).join('')}</div>
+  <div class="w" style="margin-top:14px"><h2>The draw</h2>
+  <p class="mu">${ST.drawDone?'The draw is done. Everyone gives to two people and receives from two. You cannot see who got who.':'Not run yet. Add everyone first, then run it.'}</p>
+  <button class="${ST.drawDone?'warn':'pri'}" data-act="draw">${ST.drawDone?'Run the draw again':'Run the draw'}</button></div>`;
+}
+document.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act,v=b.dataset.v;msg='';
+  if(a==='out'){try{await api('POST','logout',{})}catch(x){}setT('');ST=null;tab='home';render()}
+  else if(a==='tab'){tab=v;render()}
+  else if(a==='open'){pv=+v;tab='people';render()}
+  else if(a==='del')run('DELETE','item/'+v);
+  else if(a==='claim')run('POST','claim',{itemId:v});
+  else if(a==='unclaim')run('DELETE','claim/'+v);
+  else if(a==='draw'){if(!ST.drawDone||confirm('Run again? This clears every "bought" tick.'))run('POST','draw',{})}
+});
+document.addEventListener('submit',async e=>{
+  e.preventDefault();const f=e.target.dataset.form,g=id=>($('#'+id)||{}).value||'';msg='';
+  if(f==='login'){try{const j=await api('POST','login',{name:g('ln'),password:g('lp')});setT(j.token);await refresh()}catch(x){render()}}
+  else if(f==='add')run('POST','item',{title:g('it'),note:g('in'),link:g('il')});
+  else if(f==='extra')run('POST','extra',{owner:ST.people[pv].id,text:g('xt')});
+  else if(f==='user')run('POST','user',{name:g('un'),password:g('up')});
+});
+setInterval(()=>{if(ST&&document.activeElement.tagName!=='INPUT')refresh()},30000);
+if(T)refresh();else render();
+</script></body></html>
